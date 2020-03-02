@@ -134,3 +134,40 @@ If you want to re-structure the page you would need to modify all of the links.F
 
 This is easier to mantain just because the view function names don't change so often like urls do, and the url_for() can generate more complex urls.
 We change the directly hardcoded url in our templates and redirects to url_for().
+
+## Chapter 4-Database
+
+Flask does not support any database natively which in a sense is good news because you can choose whatever database suits you the best.
+
+We are going to use SQLAlchemy,an ORM used for many relational databases supporting MySQL,PostgreSQL,SQLite,etc.
+We install it: `$ pip install flask-sqlalchemy`.
+
+As the application grows or changes we need to address the problem of the migration and for that we'll use flask-migrate,a migration framework for SQLAlchemy.
+To develop small application the most convenient choice is SQLite as there is no need to run a database server for it.
+
+We need to modify the config file as the SQLAlchemy will take the location of the database from the variable SQLALCHEMY_DATABASE_URI.
+The database is going to be represented in the application by the database instance. The database migration engine will also have an instance.
+In the __init__ file we add an object db to represent the database and another object that represents the migration engine and import the models module to later define the structure of the db.
+We will want to represent a database model creating a representation for the users.Each user in the database will be identified by an unique id(primary key).It also has a username,email and a password hash(we store the hash and not the actual password) as strings(VARCHAR).
+We create the model User which inherits from db.Model,a base class for all models.The class defines several fields that we previously mentioned with some options such as uniqueness and indexing for the efficency of the database.
+We also define a method to print data of a particular object of a class.
+
+We create the migration repository for the blog app,a directory in which it stores its migration scripts.
+To create it we need to do: `$ flask db init`.
+
+We then proceed to create a database migration,we can do it automatically or manually.To generate the migration automatically,Alembic compares the database schema against the actual database schema used and then creates the migration script.
+At first as we don't have any previous database it will add the entire User model to the script.
+With this we create the migration script that defines to functions: upgrade() to apply the migration and downgrade() to remove it.
+We apply this changes: `$ flask db upgrade`.
+The command does not detect any existing database so will create a default SQLite one.If you have a db server you need to create the database before executing upgrade().
+
+In our app the most efficent way to store the post each user makes is by creating another table posts to store and reference the posts that a user makes.
+The posts table will have a unique id(primary key),a body(the content of the post),a timestamp and an additional field which references the post to its author-the user which posted it(referenced by using a foreign key).The relation between users and posts its "1-N" relation meaning that a user can have many posts.
+For the timestamp we use a UTC format giving it a default time of the post.Using UTC format is easier as in the server it will be converted to the users current hour.
+We reference the user_id of the posts table as a foreign key to the id of the table user.
+We modified the User table to include the posts using the db.relationship() function to link the user and the posts made.
+The first argument is then N part of the relation-"Posts",the backref is the 1 in the relation which is represented by "backref" which is the author and the "lazy" argument represents how the db query for the relationship will be issued.
+We once again will migrate it and apply the changes to the database.
+
+
+
