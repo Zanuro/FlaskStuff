@@ -1,6 +1,7 @@
 {% extends "base.html" %}
+
 {% block content %}
-	<h1>Hello and welcome, {{ user.username }} !</h1>
+	<h1>Hello and welcome, {{ current_user.username }} !</h1>
 	<h2>This are the following posts:</h2>
 	</br>
 	{% for post in posts %}

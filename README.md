@@ -169,5 +169,160 @@ We modified the User table to include the posts using the db.relationship() func
 The first argument is then N part of the relation-"Posts",the backref is the 1 in the relation which is represented by "backref" which is the author and the "lazy" argument represents how the db query for the relationship will be issued.
 We once again will migrate it and apply the changes to the database.
 
+We are going to use the logic of the db in the Python interpreter to see it working.
+` 
+>>>from application import db
+>>> from application.models import User,Post
+>>> u = User(username='Vlad', email='vladdzx@gmail.com')
+>>> db.session.add(u)
+>>> db.session.commit()`
 
+We save the changes made to a database in a session and then call commit() to write all the changes.
+You can also use rollback() to abort the session and remove any changes stored in it.
+
+We add another user and then make queries to it.
+`
+>>> u = User(username='Jimmy', email='jim12x@gmail.com')
+>>> db.session.add(u)
+>>> db.session.commit()
+>>> users = User.query.all()
+>>> users
+[<User Vlad>, <User Jimmy>]
+>>> for x in users:
+...     print(x.id,x.username)
+... 
+1 Vlad
+2 Jimmy
+`
+With the all() function we return all the element of the model User.
+We can also use: ` u = User.query.get(1) u ` to obtain a certain user.
+Then we add the posts:
+`
+>>> u = User.query.get(1)
+>>> p = Post(body='Weather in NJ', author=u)
+>>> db.session.add(p)
+>>> db.session.commit()
+`.
+We did not need to specify the user_id field because we had the db.relationship() in User that adds a posts attribute to users and a authors attribute to posts therefore we assign an author to the post instead of assigning a user_id to posts.
+We make some queries:
+`
+>>> u = User.query.get(1)
+>>> u
+<User Vlad>
+>>> posts = u.posts.all()
+>>> posts
+[<Post Weather in NJ>]
+>>> 
+>>> u = User.query.get(2)
+>>> u
+<User Jimmy>
+>>> posts = u.posts.all()
+>>> posts
+[]
+>>> posts = Post.query.all()
+>>> posts
+[<Post Weather in NJ>]
+>>> for x in posts:
+...     print(x.id, x.author.username, x.body)
+... 
+1 Vlad Weather in NJ
+`
+After that will erase the test users and posts:
+`
+>>> users = User.query.all()
+>>> users
+[<User Vlad>, <User Jimmy>]
+>>> for x in users:
+...     db.session.delete(x)
+... 
+>>> posts = Post.query.all()
+>>> posts
+[<Post Weather in NJ>]
+>>> for x in posts:
+...     db.session.delete(x)
+... 
+>>> db.session.commit()
+`.
+The flask shell command is a very useful command to use and start an interpreter in the context of the application.
+`(virtual-env) vlad@vlad-GL552JX:~/Desktop/Flask-Learning/blog$ flask shell
+Python 3.7.0 (default, Feb 28 2020, 20:15:41) 
+[GCC 7.4.0] on linux
+App: application [production]
+Instance: /home/vlad/Desktop/Flask-Learning/blog/instance
+>>> app
+<Flask 'application'>
+`.
+Using this command the interpreter pre-imports the app and you can also configure other symbols to pre-import.
+We add a shell context that adds the database instance and models to the shell session.
+
+The app.shell_context_processor decorator registers the function as a shell context function. When the flask shell command runs, it will invoke this function and register the items returned by it in the shell session. 
+After that we can work with the database entities without the need of importing them.
+`
+(virtual-env) vlad@vlad-GL552JX:~/Desktop/Flask-Learning/blog$ flask shell
+Python 3.7.0 (default, Feb 28 2020, 20:15:41) 
+[GCC 7.4.0] on linux
+App: application [production]
+Instance: /home/vlad/Desktop/Flask-Learning/blog/instance
+>>> db
+<SQLAlchemy engine=sqlite:////home/vlad/Desktop/Flask-Learning/blog/app.db>
+>>> User
+<class 'application.models.User'>
+>>> Post
+<class 'application.models.Post'>
+`.
+
+## Chapter 5-User Logins
+
+Werkzeug is a basic package in Flask used for providing function for password hashing:
+`
+(virtual-env) vlad@vlad-GL552JX:~/Desktop/Flask-Learning/blog$ python3
+Python 3.7.0 (default, Feb 28 2020, 20:15:41) 
+[GCC 7.4.0] on linux
+Type "help", "copyright", "credits" or "license" for more information.
+>>> from werkzeug.security import generate_password_hash
+>>> hash = generate_password_hash('foobar')
+>>> hash
+'pbkdf2:sha256:150000$VX2vY77A$73c36b20c02a78737943e2334864249c06b096105be74d6fedaf0f9cc9249f7f'
+>>> 
+`.
+In this example we hash the password foobar.
+And then we check if the hash matches using check_password_hash().
+
+We implement to methods to set the password hashing in our User model.We define a method set_password() to hash the password and another method check_password() to check if the hash of a password mathches a known one.
+
+We are going to use the flask-login extension to manage a user logged-in state for the user to navigate between the different 
+pages.It also has the remember me functionality that allows users to remain logged in even after closing the window.
+We install it: `$ pip install flask-login`.
+We initialize flask-login in our __init__.
+This extensions require certain properties and methods to be implemented:
+1.is_authenticated:a property that is True if the user has valid credentials or False otherwise.
+2.is_active:a property that is True if the user's account is active or False otherwise.
+3.is_anoymous:a property that is False for regular users, and True for a special, anonymous user.
+4.get_id():method that returns a unique id for the user as a string
+
+Flask-Login provides us a mixin class called UserMixin which already includes the implementations mentioned above therefore is not really necessary to create or define this properties/methods.We add this mixin to our User model.
+
+Flask-Login keeps track of the logged in user by storing its unique identifier in Flask's user session, a storage space assigned to each user who connects to the application. Each time the logged-in user navigates to a new page, Flask-Login retrieves the ID of the user from the session, and then loads that user into memory.
+We need a decorator in such manner that it will load the user given a certain id.
+Now we can modify the login view function in order to access the user database and generate and verify password hashes.
+
+In the login() view function, we use the is_authenticated variable defined in the UserMixin to check if the user is logged in and want to go to /login, therefore we don't want to allow that to happen.
+If the user wants to login we search for that username with a query in our database with the username he provided in the form, calling first() will return the exactly matching username or None.We also check if the password from the db for the user matches the password given by the user in the form,if it doesn't we flash a message and redirect him to the same page,else if the username with the password matches we call login_user() setting the user as a current_user and redirecting him to the index page.
+Will also provide a log out options for the users using the logout_user() function.
+When the user logs in we switch the link to login from the navbar to logout.We'll use the variable from the UserMixin anoynmous to check if the user is logged in or not.
+We want that users must be logged in before accesing a protected view if not they are redirected to the login view and for that we need to tell Flask which is the view that manages logins in the __init__ file.
+To protect a view function from a anoymous user is with the decorator @login_required.
+When you add this decorator to a view function below the @app.route decorators from Flask, the function becomes protected and will not allow access to users that are not authenticated
+We need to implement the redirect back from the successfull login to the page the user wanted to access.
+Also if a user wants to access the /index route the @login_required intercepts the request and respond with a redirect to /login modifying the url to /login?next=/index,after logging in it will redirect one again to the specified page.
+We'll modify the login function in such manner that when the users successfully logs in we read the request of the user obtaing the value of the next argument.If the request does not have a next argument then we redirect it to the index page.If the next argument has a relative path we redirect it to that path but if it has an absoulute path then we redirect it to the index page(we do that in order to mantain the redirections inside our app).
+We can modify our index view to welcome the currently logged in user and not a pre-made one.
+
+We will proceed creating a registration form so the users can register through a form.
+We create a register form,adding a username field,an email(validating the right email structure),a password and repeating password to match the first one mentioned.This second field has a validator to check that its value matches the value of the first field password.
+We also defined two methods to validate the correct submisson of the form,meaning that if the username or the email is already registered an error will pop up.
+We will create a template to view this page.(register.html).
+And we need to manage the user registration from the perspective of the path(routes.py).For that we will first check if the user is logged in and then if he is not logged in already we take the data from the username,email and password fields and add the user to the database and then redirects it to the login page.
+
+## Chapter 6-Profile page and avatars
 
