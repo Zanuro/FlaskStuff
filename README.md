@@ -326,3 +326,35 @@ And we need to manage the user registration from the perspective of the path(rou
 
 ## Chapter 6-Profile page and avatars
 
+We'll create a user profile page for each user.
+This route will be dynamic as we have a <username> part that changes everytime.We also have added the @login_required so that this path is only accessible to logge in users.Then we try to obtain the user based on the passed username from the database getting the user or in case the user does not exist returning a 404 error.
+Finally in case the user returns we create a list of fake posts and render the template users.html passing the user object and the list of posts and then link this page on the navigation bar.
+
+Next we are going to add user avatars using Gravatar,a service which provides images for users.To request an image for a given user we'll make a request to https://www.gravatar.com/avatar/<hash>,where <hash>
+is the MD5 hash of the users email address.
+`
+>>> from hashlib import md5
+>>> 'https://www.gravatar.com/avatar/' + md5(b'example@example.com').hexdigest()
+https://www.gravatar.com/avatar/23463b99b62a72f26ed677cc556c44e8
+`.
+
+The default size of the image is 80x80 pixels but by adding a s argument at the end of the URL you can request a image of a different size: `https://www.gravatar.com/avatar/23463b99b62a72f26ed677cc556c44e8?s=X`.
+
+There is also an option that can be passed to Gravatar as a query string argument(d) which gives an image for that users that do not have a avatar registered.
+We are going to associate an avatar to a user into our User model.We do this by creating a method avatar() that return an avatar image with a certain size,doing this by hashing the email of the user.
+Then will insert the avatar images in the user profile.
+We can also make that it show the avatar of each author of the different posts.
+
+
+We want to make so that the index page display posts with a similar layout but copying in from the existing template is not a solution.
+We'll create a sub-template that renders a post and then reference it from both the user and index templates.Then we'll include this sub-template in our user view.
+We are going to continue improving the user profile page and keep track of the last time each user accessed the site and display it on their profile page.
+We are going to extend the User's model with two new fields:about_me and last_seen.
+After adding the new fields in the user's model we need to migrate the changes and then apply this changes to the database.
+And then we'll add this field to the user's template profile.
+We we'll add them with a conditional clause just in case they are set.
+To record the last visit time for a user we are going to use a decorator before_request that we'll that the current time before the user does a certain request.Therefore if the user is authenticated and if he is then it sets the last_seen field of the current user to the time he made the request and then we commit the change to the database.Its not necessary to use the db.session.add() function as the current user is already in session and there is no need to add him again.
+We are going to implement a profile editor so they can change their username and add some information that is going to be stored in the about_me field.We are going to create a new form with a about field, a username field if the user wants to change their username and a submit button.
+And then we create the view function that creates the logic of it.
+And we'll add a link in their profile page to the edit page.
+We'll use a special condition to check that only if the user is the actual user can edit their own profile page.
